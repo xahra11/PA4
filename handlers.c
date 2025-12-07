@@ -22,9 +22,16 @@ void handle_open(Player *p, Message *msg){
         return;
     }
 
+    if(is_active(name)){
+        handle_fail(p, 22, "Already Playing");
+        return;
+    }
+
     strncpy(p->name, name, 72);
     p->name[72] = '\0';
     p->open = true;
+
+    add_active(p);
 
     send_wait(p->fd);
     printf("Player '%s' is waiting for an opponent\n", p->name);

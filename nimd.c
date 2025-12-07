@@ -11,9 +11,16 @@
 #include "send.h"
 #include "handlers.h"
 
+Player **active_players = NULL; // dynamic list of all players currently in an active game
+int total_active = 0;
+int active_cap = 0;
+
 // function prototypes
 void nimd_game(int p1, int p2);
 void create_game(Game *g, Player *p1, Player *p2);
+bool is_active(const char *name);
+void add_active(Player *p);
+void remove_active(Player *p);
 
 int main(int argc, char *argv[]) {
 
@@ -206,4 +213,35 @@ void create_game(Game *g, Player *p1, Player *p2){
     g->next_p = 1;
 }
 
+bool is_active(const char *name){
+    for(int i = 0; i < total_active; i++){
+        if(active_players[i] && strcmp(active_players[i]->name, name) == 0){
+            return true;
+        }
+    }
+    return false;
+}
 
+void add_active(Player *p){
+    if(total_active >= active_cap){
+        int new_cap = (active_cap == 0) ? 20 : active_cap * 2;
+        Player **new_list = realloc(active_players, new_cap * sizeof(Player*));
+        if(!new_list){
+            perror("realloc");
+            exit(EXIT_FAILURE);
+        }
+        active_players = new_list;
+        active_cap = new_cap;
+    }
+    active_players[total_active++] = p;
+}
+
+void remove_active(Player *p){
+    for(int i = 0; i < total_active; i++){
+        if(active_players[i] == p){
+            memmove(&active_players[i], &active_players[i + 1], (total_active - i - 1)*sizeof(Player*));
+            total_active--;
+            return;
+        }
+    }
+}
