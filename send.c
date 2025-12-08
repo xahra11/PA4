@@ -1,4 +1,5 @@
 #include "send.h"
+#include "handlers.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -96,8 +97,8 @@ int send_over(Game *g, int winner, const char *reason){
     }
 }
 
-int send_fail(int fd, int code, const char *msg){
-    char msg[200];
-    snprintf(msg, sizeof(msg), "FAIL|%02d %s|", code, msg ? msg: "");
-    return format_message(fd, msg);
+int send_fail(int fd, int code, const char *msg_text){
+    char buf[200];
+    snprintf(buf, sizeof(buf), "FAIL|%02d %s|", code, msg_text ? msg_text : "");
+    return format_message(fd, buf);
 }

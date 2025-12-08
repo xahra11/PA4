@@ -1,8 +1,12 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include "message.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <strings.h>
 
 Message *read_message(int sock_fd){
     char version, len[3];

@@ -4,7 +4,7 @@
 #include "message.h"
 #include "send.h"
 
-#define MAX_MSG_LENGTH 72
+//#define MAX_MSG_LENGTH 72
 
 typedef struct Player {
     int fd;
@@ -19,6 +19,10 @@ typedef struct Game {
     int piles[5];     // 5 piles of 1, 3, 5, 7, 9
     int next_p;  // p_num of whose turn it is
 } Game;
+
+bool is_active(const char *name);
+void add_active(Player *p);
+void remove_active(Player *p);
 
 void handle_open(Player *p, Message *msg);
 void handle_move(Game *g, Player *p, Message *msg);

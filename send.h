@@ -1,7 +1,9 @@
 #ifndef SEND_H
 #define SEND_H
 
-#include "handlers.h"
+//#include "handlers.h"
+struct Game;
+typedef struct Game Game;
 
 int send_wait(int fd);
 int send_name(int fd, int p_num, const char *opp_name);
