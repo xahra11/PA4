@@ -172,7 +172,7 @@ void nimd_game(int p1_fd, int p2_fd){
     send_name(p2_fd, 2, p1.name);
 
     send_play(&g);
-    Player *current_p;
+    // Player *current_p;
 
     while(1){
         /*current_p = (g.next_p == 1) ? &p1 : &p2;

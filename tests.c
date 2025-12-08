@@ -59,6 +59,14 @@ void test_bad_format() {
     char msg[BUF];
     if (get_msg(fd, msg) > 0)
         printf("Server replied: %s\n", msg);
+
+    //incomplete message
+    send_raw(fd, "0|05|OPEN|");   
+
+    char msg[BUF];
+    if (get_msg(fd, msg) > 0)
+        printf("Server replied: %s\n", msg);
+
     close(fd);
 }
 
@@ -67,7 +75,16 @@ void test_incorrect_frame() {
     printf("\n-- Test: INCORRECT FRAMING --\n");
     int fd = connect_client();
 
+    // unframed message
     send_raw(fd, "thisIsNotAFrame");
+
+    char msg[BUF];
+    if (get_msg(fd, msg) > 0)
+        printf("Server replied: %s\n", msg);
+    close(fd);
+
+    // no | at the end
+    send_raw(fd, "0|09|OPEN|Darren");
 
     char msg[BUF];
     if (get_msg(fd, msg) > 0)
@@ -110,6 +127,11 @@ void test_invalid_move() {
     send_raw(fd1, "0|11|MOVE|10|1|");
 
     char r[BUF];
+    get_msg(fd1, r);
+    printf("Server replied: %s\n", r);
+
+    // tries to move too many from a pile
+    send_raw(fd1, "0|09|MOVE|1|100|");
     get_msg(fd1, r);
     printf("Server replied: %s\n", r);
 
