@@ -50,7 +50,7 @@ void send_raw(int fd, const char *s) {
 
 //test 1: bad message format
 void test_bad_format() {
-    printf("\n--- Test: BAD FORMAT MESSAGE ---\n");
+    printf("\n-- Test: BAD FORMAT MESSAGE --\n");
     int fd = connect_client();
     
     //invalid length
@@ -64,7 +64,7 @@ void test_bad_format() {
 
 //test 2: incorrect framing
 void test_incorrect_frame() {
-    printf("\n--- Test: INCORRECT FRAMING ---\n");
+    printf("\n-- Test: INCORRECT FRAMING --\n");
     int fd = connect_client();
 
     send_raw(fd, "thisIsNotAFrame");
@@ -77,7 +77,7 @@ void test_incorrect_frame() {
 
 //test 3: wrong time
 void test_wrong_time() {
-    printf("\n--- Test: MESSAGE AT WRONG TIME ---\n");
+    printf("\n-- Test: MESSAGE AT WRONG TIME --\n");
     int fd = connect_client();
 
     //try to MOVE before OPEN
@@ -92,18 +92,18 @@ void test_wrong_time() {
 
 //test 4: invalid move
 void test_invalid_move() {
-    printf("\n--- Test: INVALID NIM MOVE ---\n");
+    printf("\n-- Test: INVALID NIM MOVE --\n");
     int fd1 = connect_client();
     int fd2 = connect_client();
 
     send_raw(fd1, "0|10|OPEN|Alice|");
-    get_msg(fd1, (char[BUF]){0}); // WAIT
+    get_msg(fd1, (char[BUF]){0}); //WAIT
 
     send_raw(fd2, "0|09|OPEN|Bob|");
-    get_msg(fd1, (char[BUF]){0}); // NAME
+    get_msg(fd1, (char[BUF]){0}); //NAME
     get_msg(fd2, (char[BUF]){0});
 
-    get_msg(fd1, (char[BUF]){0}); // PLAY
+    get_msg(fd1, (char[BUF]){0}); //PLAY
     get_msg(fd2, (char[BUF]){0});
 
     //Alice tries to remove from nonexistent pile 10
@@ -119,7 +119,7 @@ void test_invalid_move() {
 
 //test 5: client matching
 void test_matchmaking() {
-    printf("\n--- Test: MATCHMAKING ---\n");
+    printf("\n-- Test: MATCHMAKING --\n");
 
     int fd1 = connect_client();
     send_raw(fd1, "0|11|OPEN|Zed|");
@@ -149,7 +149,7 @@ void test_matchmaking() {
 
 //test 6: run a full game
 void test_full_game() {
-    printf("\n--- Test: FULL GAME ---\n");
+    printf("\n-- Test: FULL GAME --\n");
 
     int fd1 = connect_client();
     int fd2 = connect_client();
@@ -158,7 +158,7 @@ void test_full_game() {
     get_msg(fd1,(char[BUF]){0});
 
     send_raw(fd2, "0|11|OPEN|BBB|");
-    get_msg(fd1,(char[BUF]){0}); // NAME
+    get_msg(fd1,(char[BUF]){0}); //NAME
     get_msg(fd2,(char[BUF]){0});
 
     get_msg(fd1,(char[BUF]){0});
@@ -166,7 +166,7 @@ void test_full_game() {
 
     //play deterministic game:
     //pile states: 1 3 5 7 9
-    send_raw(fd1, "0|09|MOVE|5|9|");   //remove all 9
+    send_raw(fd1, "0|09|MOVE|5|9|"); //remove all 9
     get_msg(fd1,(char[BUF]){0});
     get_msg(fd2,(char[BUF]){0});
 
@@ -198,7 +198,7 @@ void test_full_game() {
 
 //test 7: disconnect before game
 void test_disconnect_before_game() {
-    printf("\n--- Test: DISCONNECT BEFORE MATCH ---\n");
+    printf("\n-- Test: DISCONNECT BEFORE MATCH --\n");
 
     int fd = connect_client();
     send_raw(fd, "0|11|OPEN|Solo|");
@@ -215,7 +215,7 @@ void test_disconnect_before_game() {
 
 //test 8: disconnect during game
 void test_disconnect_during_game() {
-    printf("\n--- Test: DISCONNECT DURING GAME ---\n");
+    printf("\n-- Test: DISCONNECT DURING GAME --\n");
 
     int fd1 = connect_client();
     int fd2 = connect_client();
@@ -240,9 +240,69 @@ void test_disconnect_during_game() {
     close(fd2);
 }
 
+//test 9: concurrent games
+void test_concurrent_and_duplicate() {
+    printf("\n-- Test: CONCURRENT GAMES --\n");
+
+    //game 1 with players A1 and A2
+    int A1 = connect_client();
+    int A2 = connect_client();
+
+    send_raw(A1, "0|11|OPEN|A1|");
+    get_msg(A1, (char[BUF]){0}); //WAIT
+
+    send_raw(A2, "0|11|OPEN|A2|");
+    get_msg(A1, (char[BUF]){0}); //NAME
+    get_msg(A2, (char[BUF]){0}); //NAME
+
+    get_msg(A1, (char[BUF]){0}); //PLAY
+    get_msg(A2, (char[BUF]){0}); //PLAY
+
+    //game 2 with players B1 and B2
+    int B1 = connect_client();
+    int B2 = connect_client();
+
+    send_raw(B1, "0|11|OPEN|B1|");
+    get_msg(B1, (char[BUF]){0}); //WAIT
+
+    send_raw(B2, "0|11|OPEN|B2|");
+    get_msg(B1, (char[BUF]){0}); //NAME
+    get_msg(B2, (char[BUF]){0}); //NAME
+
+    get_msg(B1, (char[BUF]){0}); //PLAY
+    get_msg(B2, (char[BUF]){0}); //PLAY
+
+    printf("Attempting duplicate name A1...\n");
+
+    //try connecting a third client with a duplicate name A1
+    int dup = connect_client();
+    send_raw(dup, "0|11|OPEN|A1|");
+
+    char reply[BUF];
+    if (get_msg(dup, reply) > 0)
+        printf("Duplicate-name reply: %s\n", reply);
+    else
+        printf("Duplicate name connection unexpectedly closed!\n");
+
+    close(dup);
+
+    //clean up  4 real players
+    send_raw(A1, "0|07|MOVE|1|1|");
+    get_msg(A1,(char[BUF]){0});
+    get_msg(A2,(char[BUF]){0});
+
+    send_raw(B1, "0|07|MOVE|1|1|");
+    get_msg(B1,(char[BUF]){0});
+    get_msg(B2,(char[BUF]){0});
+
+    close(A1);
+    close(A2);
+    close(B1);
+    close(B2);
+}
+
 int main() {
     printf("NIMD TEST\n");
-
     test_bad_format();
     test_incorrect_frame();
     test_wrong_time();
@@ -251,7 +311,7 @@ int main() {
     test_full_game();
     test_disconnect_before_game();
     test_disconnect_during_game();
-
+    test_concurrent_and_duplicate();
     printf("\nTESTING COMPLETE\n");
     return 0;
 }
