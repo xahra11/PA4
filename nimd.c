@@ -6,6 +6,7 @@
 #include <sys/socket.h> 
 #include <netinet/in.h> 
 #include <arpa/inet.h>   
+#include <sys/select.h>
 
 #include "message.h"
 #include "send.h"
@@ -174,7 +175,7 @@ void nimd_game(int p1_fd, int p2_fd){
     Player *current_p;
 
     while(1){
-        current_p = (g.next_p == 1) ? &p1 : &p2;
+        /*current_p = (g.next_p == 1) ? &p1 : &p2;
 
         msg = read_message(current_p->fd);
         if(!msg){
@@ -192,9 +193,68 @@ void nimd_game(int p1_fd, int p2_fd){
 
         handle_move(&g, current_p, msg);
         free_message(msg);
-        msg = NULL;
-    }
+        msg = NULL; */
 
+        //implement extra credit: handle messages as soon as they arrive
+        int fd1 = p1.fd;
+        int fd2 = p2.fd;
+
+        fd_set set;
+        FD_ZERO(&set);
+        FD_SET(fd1, &set);
+        FD_SET(fd2, &set);
+
+        int maxfd = (fd1 > fd2 ? fd1 : fd2) + 1;
+
+        int ready = select(maxfd, &set, NULL, NULL, NULL);
+        if (ready < 0) {
+            perror("select");
+            break;
+        }
+
+        Player *turn_p = (g.next_p == 1 ? &p1 : &p2);
+        Player *wait_p = (g.next_p == 1 ? &p2 : &p1);
+
+        //check if current player sent a message
+        if (FD_ISSET(turn_p->fd, &set)) {
+
+            Message *msg = read_message(turn_p->fd);
+
+            if (!msg) {
+                //disconnected on their turn
+                send_over(&g, wait_p->p_num, "Forfeit");
+                break;
+            }
+
+            if (strcmp(msg->type, "MOVE") != 0) {
+                handle_fail(turn_p, 31, "Expected MOVE");
+                free_message(msg);
+                continue;
+            }
+
+            //made a correct move
+            handle_move(&g, turn_p, msg);
+            free_message(msg);
+            continue;
+        }
+
+        //check if not current player sent a message
+        if (FD_ISSET(wait_p->fd, &set)) {
+
+            Message *msg = read_message(wait_p->fd);
+
+            if (!msg) {
+                //disconnected while waiting
+                send_over(&g, turn_p->p_num, "Forfeit");
+                break;
+            }
+
+            //messages from non current player not allowed
+            handle_fail(wait_p, 31, "Impatient");
+            free_message(msg);
+            continue;
+        }
+    }
     close(p1_fd);
     close(p2_fd);
 }
