@@ -132,6 +132,7 @@ void test_invalid_move() {
     get_msg(fd1, (char[BUF]){0}); //WAIT
 
     send_raw(fd2, "0|09|OPEN|Bob|");
+    get_msg(fd2, (char[BUF]){0}); //WAIT
     get_msg(fd1, (char[BUF]){0}); //NAME
     get_msg(fd2, (char[BUF]){0});
 
