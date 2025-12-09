@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
             }
             if(pid == 0){
                 // child process to run game in background
-                close(sock_fd);
+                // close(sock_fd);
                 nimd_game(p1, p2);
                 remove_active(p1);
                 remove_active(p2);
