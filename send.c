@@ -51,6 +51,7 @@ int send_wait(int fd){
 
 int send_name(int fd, int p_num, const char *opp_name){
     char msg[200];
+    // no extra trailing numbers
     snprintf(msg, sizeof(msg), "NAME|%d|%s|", p_num, opp_name ? opp_name : "");
     return format_message(fd, msg);
 }
@@ -60,20 +61,17 @@ int send_play(Game *g){
         return -1;
     }
 
-    char board[100];
-    format_board(board, sizeof(board), g->piles);
+    char board[50]; // enough for "1 3 5 7 9"
+    snprintf(board, sizeof(board), "%d %d %d %d %d",
+             g->piles[0], g->piles[1], g->piles[2], g->piles[3], g->piles[4]);
 
-    char msg[200];
+    char msg[100];
     snprintf(msg, sizeof(msg), "PLAY|%d|%s|", g->next_p, board);
 
-    int p1_reply = format_message(g->p1->fd, msg);
-    int p2_reply = format_message(g->p2->fd, msg);
+    int r1 = format_message(g->p1->fd, msg);
+    int r2 = format_message(g->p2->fd, msg);
 
-    if(p1_reply == 0 && p2_reply == 0){
-        return 0;
-    }else{
-        return -1;
-    }
+    return (r1 == 0 && r2 == 0) ? 0 : -1;
 }
 
 int send_over(Game *g, int winner, const char *reason){
@@ -81,20 +79,17 @@ int send_over(Game *g, int winner, const char *reason){
         return -1;
     }
 
-    char board[100];
-    format_board(board, sizeof(board), g->piles);
+    char board[50];
+    snprintf(board, sizeof(board), "%d %d %d %d %d",
+             g->piles[0], g->piles[1], g->piles[2], g->piles[3], g->piles[4]);
 
     char msg[200];
-    snprintf(msg, sizeof(msg), "OVER|%d|%s|%s|", winner, board, reason ? reason: "");
+    snprintf(msg, sizeof(msg), "OVER|%d|%s|%s|", winner, board, reason ? reason : "");
 
-    int p1_reply = format_message(g->p1->fd, msg);
-    int p2_reply = format_message(g->p2->fd, msg);
+    int r1 = format_message(g->p1->fd, msg);
+    int r2 = format_message(g->p2->fd, msg);
 
-    if(p1_reply == 0 && p2_reply == 0){
-        return 0;
-    }else{
-        return -1;
-    }
+    return (r1 == 0 && r2 == 0) ? 0 : -1;
 }
 
 int send_fail(int fd, int code, const char *msg_text){

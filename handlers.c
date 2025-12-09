@@ -6,30 +6,30 @@
 #include <unistd.h>
 
 
-void handle_open(Player *p, Message *msg){
-    if(!msg || msg->field_num < 1){
+void handle_open(Player *p, Message *msg) {
+    if (!msg || msg->field_num < 1) {
         handle_fail(p, 10, "Invalid");
-        close(p->fd); //when open fails must send fail and close connection
+        close(p->fd);
         return;
     }
 
     char *name = msg->fields[0];
 
-    if(!is_valid_name(name)){
+    if (!is_valid_name(name)) {
         handle_fail(p, 21, "Long Name or Invalid");
         close(p->fd);
         return;
     }
 
-    if(p->open){
+    if (p->open) {
         handle_fail(p, 23, "Already Open");
         close(p->fd);
         return;
     }
 
-    if(is_active(name)){
+    if (is_active(name)) {
         handle_fail(p, 22, "Already Playing");
-        close(p->fd);
+        close(p->fd); // tests expect connection to close
         return;
     }
 
@@ -39,7 +39,6 @@ void handle_open(Player *p, Message *msg){
 
     add_active(p);
 
-    //send_wait(p->fd);
     printf("Player '%s' connected\n", p->name);
     fflush(stdout);
 }
