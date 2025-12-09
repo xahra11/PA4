@@ -7,6 +7,7 @@
 #include <netinet/in.h> 
 #include <arpa/inet.h>   
 #include <sys/select.h>
+#include <sys/wait.h>
 
 #include "message.h"
 #include "send.h"
@@ -73,6 +74,10 @@ int main(int argc, char *argv[]) {
     while(1){
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
+
+        while(waitpid(-1, NULL, WNOHANG) > 0) {
+            // reap zombie processes
+        }
 
         int client_fd = accept(sock_fd, (struct sockaddr*)&client_addr, &client_len);
 

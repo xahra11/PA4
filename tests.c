@@ -63,7 +63,6 @@ void test_bad_format() {
     //incomplete message
     send_raw(fd, "0|05|OPEN|");   
 
-    char msg[BUF];
     if (get_msg(fd, msg) > 0)
         printf("Server replied: %s\n", msg);
 
@@ -86,7 +85,6 @@ void test_incorrect_frame() {
     // no | at the end
     send_raw(fd, "0|12|OPEN|Darren|");
 
-    char msg[BUF];
     if (get_msg(fd, msg) > 0)
         printf("Server replied: %s\n", msg);
     close(fd);

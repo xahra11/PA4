@@ -11,7 +11,7 @@ int format_message(int fd, const char *msg){
         return -1;
     }
 
-    char header[10];
+    char header[16];
     snprintf(header, sizeof(header), "0|%02d|", msg_len);
 
     int total_len = strlen(header) + msg_len;
