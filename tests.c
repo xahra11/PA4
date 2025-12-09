@@ -135,6 +135,11 @@ void test_invalid_move() {
     get_msg(fd1, r);
     printf("Server replied: %s\n", r);
 
+    // remove too little from a pile
+    send_raw(fd1, "0|10|MOVE|1|-5|");
+    get_msg(fd1, r);
+    printf("Server replied: %s\n", r);
+
     close(fd1);
     close(fd2);
 }
