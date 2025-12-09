@@ -79,7 +79,7 @@ int send_over(Game *g, int winner, const char *reason){
         return -1;
     }
 
-    char board[50];
+    char board[50]; 
     snprintf(board, sizeof(board), "%d %d %d %d %d",
              g->piles[0], g->piles[1], g->piles[2], g->piles[3], g->piles[4]);
 
