@@ -3,10 +3,13 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <unistd.h>
+
 
 void handle_open(Player *p, Message *msg){
     if(!msg || msg->field_num < 1){
         handle_fail(p, 10, "Invalid");
+        close(p->fd); //when open fails must send fail and close connection
         return;
     }
 
@@ -14,16 +17,19 @@ void handle_open(Player *p, Message *msg){
 
     if(!is_valid_name(name)){
         handle_fail(p, 21, "Long Name or Invalid");
+        close(p->fd);
         return;
     }
 
     if(p->open){
         handle_fail(p, 23, "Already Open");
+        close(p->fd);
         return;
     }
 
     if(is_active(name)){
         handle_fail(p, 22, "Already Playing");
+        close(p->fd);
         return;
     }
 
@@ -33,8 +39,9 @@ void handle_open(Player *p, Message *msg){
 
     add_active(p);
 
-    send_wait(p->fd);
-    printf("Player '%s' is waiting for an opponent\n", p->name);
+    //send_wait(p->fd);
+    printf("Player '%s' connected\n", p->name);
+    fflush(stdout);
 }
 
 void handle_move(Game *g, Player *p, Message *msg){
@@ -55,17 +62,21 @@ void handle_move(Game *g, Player *p, Message *msg){
 
     if(pile < 1 || pile > 5){
         handle_fail(p, 32, "Pile Index");
+        send_play(g);
         return;
     }
 
     if(quantity < 1 || quantity > g->piles[pile - 1]){
         handle_fail(p, 33, "Quantity");
+        send_play(g);
         return;
     }
 
     // make valid move
     g->piles[pile - 1] -= quantity;
     printf("Player %s removed %d from pile %d\n", p->name, quantity, pile);
+    fflush(stdout);
+
 
     // check if player won and all piles are empty
     bool empty = true;
@@ -93,6 +104,8 @@ void handle_fail(Player *p, int code, const char *msg){
 
     send_fail(p->fd, code, msg);
     printf("Sent FAIL to player %s because %s (%d)\n", p->name, msg, code);
+    fflush(stdout);
+
 }
 
 void handle_fail_fd(int fd, int code, const char *msg){
@@ -101,4 +114,6 @@ void handle_fail_fd(int fd, int code, const char *msg){
     }
     send_fail(fd, code, msg);
     printf("Sent FAIL to fd %d because %s (%d)\n", fd, msg, code);
+    fflush(stdout);
+
 }

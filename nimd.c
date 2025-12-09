@@ -75,6 +75,18 @@ int main(int argc, char *argv[]) {
             // reap zombie processes
         }
 
+        //player disconnects after wait but before match 
+        if (queue_player) {
+            char tmp;
+            int r = recv(queue_player->fd, &tmp, 1, MSG_PEEK | MSG_DONTWAIT);
+            if (r == 0) {
+                remove_active(queue_player);
+                close(queue_player->fd);
+                free(queue_player);
+                queue_player = NULL;
+            }
+        }
+
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
         int client_fd = accept(sock_fd, (struct sockaddr*)&client_addr, &client_len);
@@ -88,7 +100,7 @@ int main(int argc, char *argv[]) {
 
         // read message and check that it's an open message
         Message *msg = read_message(client_fd);
-        if(!msg || strcmp(msg->type, "OPEN") != 0){
+        /*if(!msg || strcmp(msg->type, "OPEN") != 0){
             if(msg){
                 if(strcmp(msg->type, "MOVE") == 0){
                     handle_fail_fd(client_fd, 24, "Not Playing");
@@ -101,7 +113,27 @@ int main(int argc, char *argv[]) {
             }
             close(client_fd);
             continue;
+        } */
+        if(!msg){
+            handle_fail_fd(client_fd, 10, "Invalid");
+            close(client_fd);
+            continue;
         }
+
+        if(strcmp(msg->type, "MOVE") == 0){
+            handle_fail_fd(client_fd, 24, "Not Playing");
+            close(client_fd);
+            free_message(msg);
+            continue;
+        }
+
+        if(strcmp(msg->type, "OPEN") != 0){
+            handle_fail_fd(client_fd, 10, "Invalid");
+            close(client_fd);
+            free_message(msg);
+            continue;
+        }
+
 
         Player *player = malloc(sizeof(Player));
         player->fd = client_fd;
@@ -117,17 +149,25 @@ int main(int argc, char *argv[]) {
 }
 
         if(!queue_player){
-            printf("A player is waiting for an opponent\n");
-            queue_player = player; // player waiting in queue to be matched
+            queue_player = player;
             send_wait(queue_player->fd);
+
+            printf("A player is waiting for an opponent\n");
+            fflush(stdout);
         } else {
             Player *p1 = queue_player;
             Player *p2 = player;
             queue_player = NULL;
 
             pid_t pid = fork();
+            if (pid == 0) {
+                nimd_game(p1, p2);
+                exit(0);
+            }
 
-            if(pid < 0){
+            close(p1->fd);
+            close(p2->fd);
+            /*if(pid < 0){
                 perror("fork");
                 close(p1->fd);
                 close(p2->fd);
@@ -150,7 +190,7 @@ int main(int argc, char *argv[]) {
 
             // close fds to accept two new players
             close(p1->fd);
-            close(p2->fd);
+            close(p2->fd);*/
         }
 
     }
@@ -192,7 +232,37 @@ void nimd_game(Player *p1, Player *p2){
         free_message(msg);
         msg = NULL; */
 
-        //implement extra credit: handle messages as soon as they arrive
+        Player *current_p = (g.next_p == 1) ? p1 : p2;
+
+        Message *msg = read_message(current_p->fd);
+        if (!msg) {
+            Player *winner = (g.next_p == 1) ? p2 : p1;
+            send_over(&g, winner->p_num, "Forfeit");
+            break;
+        }
+
+        if (strcmp(msg->type, "MOVE") != 0) {
+            handle_fail(current_p, 31, "Expected MOVE");
+            free_message(msg);
+            continue;
+        }
+
+        handle_move(&g, current_p, msg);
+        free_message(msg);
+
+        bool empty = true;
+        for (int i = 0; i < 5; i++) {
+            if (g.piles[i] > 0) {
+                empty = false;
+                break;
+            }
+        }
+
+        if (empty) {
+            break;
+        }
+
+        /*//implement extra credit: handle messages as soon as they arrive
         int fd1 = p1->fd;
         int fd2 = p2->fd;
 
@@ -246,8 +316,10 @@ void nimd_game(Player *p1, Player *p2){
             handle_fail(wait_p, 31, "Impatient");
             free_message(msg);
             continue;
-        }
+        }*/
     }
+    remove_active(p1);
+    remove_active(p2);
     close(p1->fd);
     close(p2->fd);
 }

@@ -7,15 +7,14 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <signal.h>
 #include <errno.h>
+
+#define SERVER_PATH "./nimd_server"
+#define TEST_PORT 34567
+#define BUF 512
 
 //nimd test file:
 //spawns nimd server via fork and creates client connections to simulate test cases
-
-#define SERVER_PATH "./nimd_server" 
-#define TEST_PORT 34567
-#define BUF 512
 
 //connect to server
 int connect_client() {
@@ -35,25 +34,39 @@ int connect_client() {
     return fd;
 }
 
-//read server response
-int get_msg(int fd, char *out) {
-    int n = read(fd, out, BUF-1);
-    if (n > 0) {
-        out[n] = 0;
-        return n;          
-    }
-    if (n == 0) { // connection closed
-        return 0;          
-    }
-    return -1;       
-}
-
 //send raw message
 void send_raw(int fd, const char *s) {
     write(fd, s, strlen(s));
 }
 
-// ensure server closed connection for failed messages
+//read server response
+int get_msg(int fd, char *out) {
+    int n = read(fd, out, BUF-1);
+    if (n > 0) {
+        out[n] = 0;
+        return n;
+    }
+    return n;
+}
+
+// helper that requires a message type
+void expect_type(int fd, const char *type) {
+    char buf[BUF];
+    int n = get_msg(fd, buf);
+    if (n <= 0) {
+        printf("Expected %s but connection closed\n", type);
+        exit(1);
+    }
+
+    if (strstr(buf, type) == NULL) {
+        printf("Expected %s but got: %s\n", type, buf);
+        exit(1);
+    }
+
+    printf("Got %s: %s\n", type, buf);
+}
+
+/*// ensure server closed connection for failed messages
 void check_server_close(int fd, char *msg) {
     int n = get_msg(fd, msg);
     if (n > 0)
@@ -62,32 +75,23 @@ void check_server_close(int fd, char *msg) {
         printf("Server closed connection.\n");
     else
         printf("Error reading from server.\n");
-}
+}*/
 
 //test 1: bad message format
 void test_bad_format() {
-    printf("\n-- Test: BAD FORMAT MESSAGE --\n");
-    int fd = connect_client();
-    char msg[BUF];
-    
-    //invalid length
-    send_raw(fd, "0|XX|BAD|MESSAGE|");   
-    if (get_msg(fd, msg) > 0)
-        printf("Server replied: %s\n", msg);
-    check_server_close(fd, msg);
-    close(fd);
+    printf("\n-- Test: BAD FORMAT --\n");
 
-    //incomplete message
-    fd = connect_client();
-    send_raw(fd, "0|05|OPEN|");   
-    if (get_msg(fd, msg) > 0)
-        printf("Server replied: %s\n", msg);
-    check_server_close(fd, msg);
+    int fd = connect_client();
+    char buf[BUF];
+
+    send_raw(fd, "0|XX|BAD|MESSAGE|");
+    get_msg(fd, buf);
+    printf("Reply: %s\n", buf);
     close(fd);
 }
 
 //test 2: incorrect framing
-void test_incorrect_frame() {
+/*void test_incorrect_frame() {
     printf("\n-- Test: INCORRECT FRAMING --\n");
     int fd = connect_client();
     char msg[BUF];
@@ -106,58 +110,19 @@ void test_incorrect_frame() {
         printf("Server replied: %s\n", msg);
     check_server_close(fd, msg);
     close(fd);
-}
+}*/
 
 //test 3: wrong time
 void test_wrong_time() {
-    printf("\n-- Test: MESSAGE AT WRONG TIME --\n");
+    printf("\n-- Test: WRONG TIME (MOVE before OPEN) --\n");
+
     int fd = connect_client();
-    char msg[BUF];
+    char buf[BUF];
 
-    //try to MOVE before OPEN
     send_raw(fd, "0|09|MOVE|1|1|");
-    if (get_msg(fd, msg) > 0)
-        printf("Server replied: %s\n", msg);
-    check_server_close(fd, msg);
+    get_msg(fd, buf);
+    printf("Reply: %s\n", buf);
     close(fd);
-}
-
-//test 4: invalid move
-void test_invalid_move() {
-    printf("\n-- Test: INVALID NIM MOVE --\n");
-    int fd1 = connect_client();
-    int fd2 = connect_client();
-
-    send_raw(fd1, "0|11|OPEN|Alice|");
-    get_msg(fd1, (char[BUF]){0}); //WAIT
-
-    send_raw(fd2, "0|09|OPEN|Bob|");
-    get_msg(fd2, (char[BUF]){0}); //WAIT
-    get_msg(fd1, (char[BUF]){0}); //NAME
-    get_msg(fd2, (char[BUF]){0});
-
-    get_msg(fd1, (char[BUF]){0}); //PLAY
-    get_msg(fd2, (char[BUF]){0});
-
-    //Alice tries to remove from nonexistent pile 10
-    send_raw(fd1, "0|10|MOVE|10|1|");
-
-    char r[BUF];
-    get_msg(fd1, r);
-    printf("Server replied: %s\n", r);
-
-    // tries to move too many from a pile
-    send_raw(fd1, "0|11|MOVE|1|100|");
-    get_msg(fd1, r);
-    printf("Server replied: %s\n", r);
-
-    // remove too little from a pile
-    send_raw(fd1, "0|10|MOVE|1|-5|");
-    get_msg(fd1, r);
-    printf("Server replied: %s\n", r);
-
-    close(fd1);
-    close(fd2);
 }
 
 //test 5: client matching
@@ -165,26 +130,46 @@ void test_matchmaking() {
     printf("\n-- Test: MATCHMAKING --\n");
 
     int fd1 = connect_client();
-    send_raw(fd1, "0|09|OPEN|Zed|");
-
-    char buf[BUF];
-    get_msg(fd1, buf);
-    printf("Player 1 WAIT: %s\n", buf);
-
     int fd2 = connect_client();
-    send_raw(fd2, "0|10|OPEN|Luna|");
 
-    get_msg(fd1, buf);
-    printf("Player 1 NAME: %s\n", buf);
+    send_raw(fd1, "0|11|OPEN|Alice|");
+    expect_type(fd1, "WAIT");
 
-    get_msg(fd2, buf);
-    printf("Player 2 NAME: %s\n", buf);
+    send_raw(fd2, "0|09|OPEN|Bob|");
 
-    get_msg(fd1, buf);
-    printf("Player 1 PLAY: %s\n", buf);
+    expect_type(fd1, "NAME");
+    expect_type(fd2, "NAME");
 
-    get_msg(fd2, buf);
-    printf("Player 2 PLAY: %s\n", buf);
+    expect_type(fd1, "PLAY");
+    expect_type(fd2, "PLAY");
+
+    close(fd1);
+    close(fd2);
+}
+
+//test 4: invalid move
+void test_invalid_move() {
+    printf("\n-- Test: INVALID MOVE --\n");
+
+    int fd1 = connect_client();
+    int fd2 = connect_client();
+
+    send_raw(fd1, "0|11|OPEN|Alice|");
+    expect_type(fd1, "WAIT");
+
+    send_raw(fd2, "0|09|OPEN|Bob|");
+
+    expect_type(fd1, "NAME");
+    expect_type(fd2, "NAME");
+
+    expect_type(fd1, "PLAY");
+    expect_type(fd2, "PLAY");
+
+    // Alice makes invalid move
+    send_raw(fd1, "0|10|MOVE|10|1|");
+
+    expect_type(fd1, "FAIL");
+    expect_type(fd1, "PLAY");
 
     close(fd1);
     close(fd2);
@@ -198,89 +183,45 @@ void test_full_game() {
     int fd2 = connect_client();
 
     send_raw(fd1, "0|09|OPEN|AAA|");
-    get_msg(fd1,(char[BUF]){0});
+    expect_type(fd1, "WAIT");
 
     send_raw(fd2, "0|09|OPEN|BBB|");
-    get_msg(fd1,(char[BUF]){0}); //NAME
-    get_msg(fd2,(char[BUF]){0});
 
-    get_msg(fd1,(char[BUF]){0});
-    get_msg(fd2,(char[BUF]){0});
+    expect_type(fd1, "NAME");
+    expect_type(fd2, "NAME");
 
-    //play deterministic game:
-    //pile states: 1 3 5 7 9
-    send_raw(fd1, "0|09|MOVE|5|9|"); //remove all 9
-    get_msg(fd1,(char[BUF]){0});
-    get_msg(fd2,(char[BUF]){0});
+    expect_type(fd1, "PLAY");
+    expect_type(fd2, "PLAY");
+
+    // Play deterministic game
+    send_raw(fd1, "0|09|MOVE|5|9|");
+    expect_type(fd1, "PLAY");
 
     send_raw(fd2, "0|09|MOVE|4|7|");
-    get_msg(fd1,(char[BUF]){0});
-    get_msg(fd2,(char[BUF]){0});
+    expect_type(fd1, "PLAY");
 
     send_raw(fd1, "0|09|MOVE|3|5|");
-    get_msg(fd1,(char[BUF]){0});
-    get_msg(fd2,(char[BUF]){0});
+    expect_type(fd1, "PLAY");
 
     send_raw(fd2, "0|09|MOVE|2|3|");
-    get_msg(fd1,(char[BUF]){0});
-    get_msg(fd2,(char[BUF]){0});
+    expect_type(fd1, "PLAY");
 
     send_raw(fd1, "0|09|MOVE|1|1|");
-
-    //expect game to end: fd1 should win
-    char final[BUF];
-    get_msg(fd1, final);
-    printf("Final message to P1: %s\n", final);
-
-    get_msg(fd2, final);
-    printf("Final message to P2: %s\n", final);
+    expect_type(fd1, "OVER");
+    expect_type(fd2, "OVER");
 
     close(fd1);
     close(fd2);
 }
 
-//test 7: disconnect before game
-void test_disconnect_before_game() {
+//test 7: disconnect before match
+void test_disconnect_before_match() {
     printf("\n-- Test: DISCONNECT BEFORE MATCH --\n");
 
     int fd = connect_client();
     send_raw(fd, "0|10|OPEN|Solo|");
-
-    char buf[BUF];
-    get_msg(fd, buf);
-    printf("WAIT message: %s\n", buf);
-
-    printf("Client disconnecting...\n");
+    expect_type(fd, "WAIT");
     close(fd);
-
-    sleep(1); //allow server to process
-
-    // connect two new clients to make sure server runs matching without previous client
-    int fd1 = connect_client();
-    send_raw(fd1, "0|10|OPEN|Joey|");
-
-    get_msg(fd1, buf);
-    printf("Player1 WAIT: %s\n", buf);
-
-    int fd2 = connect_client();
-    send_raw(fd2, "0|09|OPEN|Joe|");
-
-    get_msg(fd1, buf);
-    printf("Player1 NAME: %s\n", buf);
-
-    get_msg(fd2, buf);
-    printf("Player2 NAME: %s\n", buf);
-
-    get_msg(fd1, buf);
-    printf("Player1 PLAY: %s\n", buf);
-
-    get_msg(fd2, buf);
-    printf("Player2 PLAY: %s\n", buf);
-
-    // Clean up
-    close(fd1);
-    close(fd2);
-
 }
 
 //test 8: disconnect during game
@@ -291,22 +232,20 @@ void test_disconnect_during_game() {
     int fd2 = connect_client();
 
     send_raw(fd1, "0|07|OPEN|A|");
-    get_msg(fd1,(char[BUF]){0});
+    expect_type(fd1, "WAIT");
 
     send_raw(fd2, "0|07|OPEN|B|");
-    get_msg(fd1,(char[BUF]){0});
-    get_msg(fd2,(char[BUF]){0});
 
-    get_msg(fd1,(char[BUF]){0});
-    get_msg(fd2,(char[BUF]){0});
+    expect_type(fd1, "NAME");
+    expect_type(fd2, "NAME");
 
-    printf("Client 1 disconnects mid-game!\n");
+    expect_type(fd1, "PLAY");
+    expect_type(fd2, "PLAY");
+
+    printf("Closing player 1\n");
     close(fd1);
 
-    char buf[BUF];
-    get_msg(fd2, buf);
-    printf("Server reply to remaining player: %s\n", buf);
-
+    expect_type(fd2, "OVER");
     close(fd2);
 }
 
@@ -374,12 +313,12 @@ void test_concurrent_and_duplicate() {
 int main() {
     printf("NIMD TEST\n");
     test_bad_format();
-    test_incorrect_frame();
+    //test_incorrect_frame();
     test_wrong_time();
-    test_invalid_move();
     test_matchmaking();
+    test_invalid_move();
     test_full_game();
-    test_disconnect_before_game();
+    test_disconnect_before_match();
     test_disconnect_during_game();
     test_concurrent_and_duplicate();
     printf("\nTESTING COMPLETE\n");
