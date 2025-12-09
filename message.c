@@ -8,19 +8,34 @@
 #include <unistd.h>
 #include <strings.h>
 
+int read_n_bytes(int fd, char *buf, int n) {
+    int total = 0;
+    while(total < n) {
+        int r = read(fd, buf + total, n - total);
+        if(r <= 0){
+            return r; 
+        }
+        total += r;
+    }
+    return total;
+}
+
 Message *read_message(int sock_fd){
-    char version, len[3];
+    char version, len[2];
 
     // read version (always 0)
-    if(read(sock_fd, &version, 1) <= 0){
+    if(read_n_bytes(sock_fd, &version, 1) <= 0){
         return NULL;
     }
 
     // read message length (2 decimal digits)
-    if(read(sock_fd, len, 2) <= 0){
+    if(read_n_bytes(sock_fd, len, 2) <= 0){
         return NULL;
     }
-    len[2] = '\0';
+
+    if(!isdigit(len[0]) || !isdigit(len[1])){
+        return NULL;
+    } 
     int msg_len = atoi(len);
 
     // use message length to read remaining bytes
@@ -29,24 +44,24 @@ Message *read_message(int sock_fd){
         return NULL;
     }
 
-    int bytes_read = 0;
-    while(bytes_read < msg_len){
-        int b = read(sock_fd, buf + bytes_read, msg_len - bytes_read);
-        if(b <= 0){
-            free(buf);
-            return NULL;
-        }
-        bytes_read += b;
+    if(read_n_bytes(sock_fd, buf, msg_len) <= 0){
+        free(buf);
+        return NULL;
     }
+
     buf[msg_len] = '\0';
 
     char *fields[10];
     int num = 0;
-
     char *token = strtok(buf, "|");
     while(token && num < 10){
         fields[num++] = token;
         token = strtok(NULL, "|");
+    }
+
+    if(num == 0){
+        free(buf);
+        return NULL;
     }
 
     Message *msg = malloc(sizeof(Message));

@@ -89,7 +89,11 @@ int main(int argc, char *argv[]) {
         // read message and check that it's an open message
         Message *msg = read_message(client_fd);
         if(!msg || strcmp(msg->type, "OPEN") != 0){
-            handle_fail_fd(client_fd, 10, "Invalid");
+            if(strcmp(msg->type, "MOVE") == 0){
+                handle_fail_fd(client_fd, 24, "Not Playing");
+            }else{
+                handle_fail_fd(client_fd, 10, "Invalid");
+            }
             if(msg){
                 free_message(msg);
             }

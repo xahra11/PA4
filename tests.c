@@ -48,24 +48,36 @@ void send_raw(int fd, const char *s) {
     write(fd, s, strlen(s));
 }
 
+// ensure server closed connection for failed messages
+void check_server_close(int fd, char *msg) {
+    int n = get_msg(fd, msg);
+    if (n > 0)
+        printf("Server replied: %s\n", msg);
+    else if (n == 0)
+        printf("Server closed connection.\n");
+    else
+        printf("Error reading from server.\n");
+}
+
 //test 1: bad message format
 void test_bad_format() {
     printf("\n-- Test: BAD FORMAT MESSAGE --\n");
     int fd = connect_client();
+    char msg[BUF];
     
     //invalid length
     send_raw(fd, "0|XX|BAD|MESSAGE|");   
-
-    char msg[BUF];
     if (get_msg(fd, msg) > 0)
         printf("Server replied: %s\n", msg);
+    check_server_close(fd, msg);
+    close(fd);
 
     //incomplete message
+    fd = connect_client();
     send_raw(fd, "0|05|OPEN|");   
-
     if (get_msg(fd, msg) > 0)
         printf("Server replied: %s\n", msg);
-
+    check_server_close(fd, msg);
     close(fd);
 }
 
@@ -73,20 +85,21 @@ void test_bad_format() {
 void test_incorrect_frame() {
     printf("\n-- Test: INCORRECT FRAMING --\n");
     int fd = connect_client();
+    char msg[BUF];
 
     // unframed message
     send_raw(fd, "thisIsNotAFrame");
-
-    char msg[BUF];
     if (get_msg(fd, msg) > 0)
         printf("Server replied: %s\n", msg);
+    check_server_close(fd, msg);
     close(fd);
 
     // no | at the end
+    fd = connect_client();
     send_raw(fd, "0|12|OPEN|Darren|");
-
     if (get_msg(fd, msg) > 0)
         printf("Server replied: %s\n", msg);
+    check_server_close(fd, msg);
     close(fd);
 }
 
@@ -94,14 +107,13 @@ void test_incorrect_frame() {
 void test_wrong_time() {
     printf("\n-- Test: MESSAGE AT WRONG TIME --\n");
     int fd = connect_client();
+    char msg[BUF];
 
     //try to MOVE before OPEN
     send_raw(fd, "0|09|MOVE|1|1|");
-
-    char buf[BUF];
-    get_msg(fd, buf);
-    printf("Server replied: %s\n", buf);
-
+    if (get_msg(fd, msg) > 0)
+        printf("Server replied: %s\n", msg);
+    check_server_close(fd, msg);
     close(fd);
 }
 
