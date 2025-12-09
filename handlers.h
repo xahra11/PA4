@@ -27,5 +27,6 @@ void remove_active(Player *p);
 void handle_open(Player *p, Message *msg);
 void handle_move(Game *g, Player *p, Message *msg);
 void handle_fail(Player *p, int code, const char *msg);
+void handle_fail_fd(int fd, int code, const char *msg);
 
 #endif 

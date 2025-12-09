@@ -94,3 +94,11 @@ void handle_fail(Player *p, int code, const char *msg){
     send_fail(p->fd, code, msg);
     printf("Sent FAIL to player %s because %s (%d)\n", p->name, msg, code);
 }
+
+void handle_fail_fd(int fd, int code, const char *msg){
+    if(fd < 0) {
+        return;
+    }
+    send_fail(fd, code, msg);
+    printf("Sent FAIL to fd %d because %s (%d)\n", fd, msg, code);
+}

@@ -18,7 +18,7 @@ int total_active = 0;
 int active_cap = 0;
 
 // function prototypes
-void nimd_game(int p1, int p2);
+void nimd_game(Player *p1, Player *p2);
 void create_game(Game *g, Player *p1, Player *p2);
 bool is_active(const char *name);
 void add_active(Player *p);
@@ -68,17 +68,15 @@ int main(int argc, char *argv[]) {
     }
 
     printf("nimd server listening on port %d\n", port_number);
-    bool queue = false; // no one is in queue to play
-    int queue_fd = -1;
+    Player *queue_player = NULL; // no one is in queue to play
 
     while(1){
-        struct sockaddr_in client_addr;
-        socklen_t client_len = sizeof(client_addr);
-
         while(waitpid(-1, NULL, WNOHANG) > 0) {
             // reap zombie processes
         }
 
+        struct sockaddr_in client_addr;
+        socklen_t client_len = sizeof(client_addr);
         int client_fd = accept(sock_fd, (struct sockaddr*)&client_addr, &client_len);
 
         if(client_fd < 0){
@@ -88,36 +86,69 @@ int main(int argc, char *argv[]) {
 
         printf("nimd server accepted connection from client\n");
 
-        if(!queue){
-            printf("A player is waiting for an opponent\n");
-            queue_fd = client_fd; // fd of player waiting in queue to be matched
-            queue = true; 
-        }else{
-            int p1_fd = queue_fd;
-            int p2_fd = client_fd;
-            queue = false; // players are paired, queue resets
+        // read message and check that it's an open message
+        Message *msg = read_message(client_fd);
+        if(!msg || strcmp(msg->type, "OPEN") != 0){
+            handle_fail_fd(client_fd, 10, "Invalid");
+            if(msg){
+                free_message(msg);
+            }
+            close(client_fd);
+            continue;
+        }
 
-            printf("2 players have been matched, nimd game has started\n");
+        Player *player = malloc(sizeof(Player));
+        player->fd = client_fd;
+        player->open = true;
+        player->p_num = 0;
+        strncpy(player->name, msg->fields[0], sizeof(player->name) - 1);
+        player->name[sizeof(player->name) - 1] = '\0';
+        free_message(msg);
+
+        if(is_active(player->name)){
+            handle_fail(player, 22, "Already Playing");
+            close(client_fd);
+            free(player);
+            continue;
+        }
+
+        add_active(player);
+
+        if(!queue_player){
+            printf("A player is waiting for an opponent\n");
+            queue_player = player; // player waiting in queue to be matched
+            send_wait(queue_player->fd);
+        } else {
+            Player *p1 = queue_player;
+            Player *p2 = player;
+            queue_player = NULL;
 
             pid_t pid = fork();
 
             if(pid < 0){
                 perror("fork");
-                close(p1_fd);
-                close(p2_fd);
+                close(p1->fd);
+                close(p2->fd);
+                remove_active(p1);
+                remove_active(p2);
+                free(p1);
+                free(p2);
                 continue;
             }
-
             if(pid == 0){
                 // child process to run game in background
                 close(sock_fd);
-                nimd_game(p1_fd, p2_fd);
+                nimd_game(p1, p2);
+                remove_active(p1);
+                remove_active(p2);
+                free(p1);
+                free(p2);
                 exit(0);
             }
 
             // close fds to accept two new players
-            close(p1_fd);
-            close(p2_fd);
+            close(p1->fd);
+            close(p2->fd);
         }
 
     }
@@ -127,54 +158,13 @@ int main(int argc, char *argv[]) {
 
 }
 
-void nimd_game(int p1_fd, int p2_fd){
-    Player p1 ={
-        .fd = p1_fd,
-        .p_num = 1,
-        .open = false
-    };
-
-    Player p2 ={
-        .fd = p2_fd,
-        .p_num = 2,
-        .open = false
-    };
-
+void nimd_game(Player *p1, Player *p2){
     Game g;
-    create_game(&g, &p1, &p2);
-    Message *msg = NULL;
-
-    // read OPEN message from player 1, get name
-    msg = read_message(p1_fd);
-    if(!msg || strcmp(msg->type, "OPEN") != 0){
-        handle_fail(&p1, 10, "Expected OPEN");
-        if(msg){
-            free_message(msg);
-        }
-        return;
-    }
-
-    handle_open(&p1, msg);
-    free_message(msg);
-    msg = NULL;
-
-    // read OPEN message from player 2, get name
-    msg = read_message(p2_fd);
-    if(!msg || strcmp(msg->type, "OPEN") != 0){
-        handle_fail(&p2, 10, "Expected OPEN");
-        if(msg){
-            free_message(msg);
-        }
-        return;
-    }
-
-    handle_open(&p2, msg);
-    free_message(msg);
-    msg = NULL;
+    create_game(&g, p1, p2);
 
     // send opponent's name to both players
-    send_name(p1_fd, 1, p2.name);
-    send_name(p2_fd, 2, p1.name);
+    send_name(p1->fd, 1, p2->name);
+    send_name(p2->fd, 2, p1->name);
 
     send_play(&g);
     // Player *current_p;
@@ -201,8 +191,8 @@ void nimd_game(int p1_fd, int p2_fd){
         msg = NULL; */
 
         //implement extra credit: handle messages as soon as they arrive
-        int fd1 = p1.fd;
-        int fd2 = p2.fd;
+        int fd1 = p1->fd;
+        int fd2 = p2->fd;
 
         fd_set set;
         FD_ZERO(&set);
@@ -217,14 +207,12 @@ void nimd_game(int p1_fd, int p2_fd){
             break;
         }
 
-        Player *turn_p = (g.next_p == 1 ? &p1 : &p2);
-        Player *wait_p = (g.next_p == 1 ? &p2 : &p1);
+        Player *turn_p = (g.next_p == 1 ? p1 : p2);
+        Player *wait_p = (g.next_p == 1 ? p2 : p1);
 
         //check if current player sent a message
         if (FD_ISSET(turn_p->fd, &set)) {
-
             Message *msg = read_message(turn_p->fd);
-
             if (!msg) {
                 //disconnected on their turn
                 send_over(&g, wait_p->p_num, "Forfeit");
@@ -245,9 +233,7 @@ void nimd_game(int p1_fd, int p2_fd){
 
         //check if not current player sent a message
         if (FD_ISSET(wait_p->fd, &set)) {
-
             Message *msg = read_message(wait_p->fd);
-
             if (!msg) {
                 //disconnected while waiting
                 send_over(&g, turn_p->p_num, "Forfeit");
@@ -260,8 +246,8 @@ void nimd_game(int p1_fd, int p2_fd){
             continue;
         }
     }
-    close(p1_fd);
-    close(p2_fd);
+    close(p1->fd);
+    close(p2->fd);
 }
 
 void create_game(Game *g, Player *p1, Player *p2){
