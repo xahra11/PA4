@@ -89,8 +89,10 @@ int main(int argc, char *argv[]) {
         // read message and check that it's an open message
         Message *msg = read_message(client_fd);
         if(!msg || strcmp(msg->type, "OPEN") != 0){
-            if(strcmp(msg->type, "MOVE") == 0){
-                handle_fail_fd(client_fd, 24, "Not Playing");
+            if(msg){
+                if(strcmp(msg->type, "MOVE") == 0){
+                    handle_fail_fd(client_fd, 24, "Not Playing");
+                }
             }else{
                 handle_fail_fd(client_fd, 10, "Invalid");
             }
@@ -103,20 +105,16 @@ int main(int argc, char *argv[]) {
 
         Player *player = malloc(sizeof(Player));
         player->fd = client_fd;
-        player->open = true;
+        player->open = false;
         player->p_num = 0;
-        strncpy(player->name, msg->fields[0], sizeof(player->name) - 1);
-        player->name[sizeof(player->name) - 1] = '\0';
+        handle_open(player, msg);
         free_message(msg);
 
-        if(is_active(player->name)){
-            handle_fail(player, 22, "Already Playing");
+        if(!player->open){ // handle_fail already sent inside handle_open()
             close(client_fd);
             free(player);
-            continue;
-        }
-
-        add_active(player);
+        continue;
+}
 
         if(!queue_player){
             printf("A player is waiting for an opponent\n");

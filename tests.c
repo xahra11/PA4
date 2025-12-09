@@ -38,9 +38,14 @@ int connect_client() {
 //read server response
 int get_msg(int fd, char *out) {
     int n = read(fd, out, BUF-1);
-    if (n <= 0) return -1;
-    out[n] = 0;
-    return n;
+    if (n > 0) {
+        out[n] = 0;
+        return n;          
+    }
+    if (n == 0) { // connection closed
+        return 0;          
+    }
+    return -1;       
 }
 
 //send raw message
@@ -96,7 +101,7 @@ void test_incorrect_frame() {
 
     // no | at the end
     fd = connect_client();
-    send_raw(fd, "0|12|OPEN|Darren|");
+    send_raw(fd, "0|11|OPEN|Darren");
     if (get_msg(fd, msg) > 0)
         printf("Server replied: %s\n", msg);
     check_server_close(fd, msg);

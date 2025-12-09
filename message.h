@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#define MAX_MSG_LENGTH 104
+#define MAX_MSG_LENGTH 99
 
 typedef struct {
     char version; // should always be 0
