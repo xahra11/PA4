@@ -84,7 +84,7 @@ void test_incorrect_frame() {
     close(fd);
 
     // no | at the end
-    send_raw(fd, "0|09|OPEN|Darren");
+    send_raw(fd, "0|12|OPEN|Darren|");
 
     char msg[BUF];
     if (get_msg(fd, msg) > 0)
@@ -113,7 +113,7 @@ void test_invalid_move() {
     int fd1 = connect_client();
     int fd2 = connect_client();
 
-    send_raw(fd1, "0|10|OPEN|Alice|");
+    send_raw(fd1, "0|11|OPEN|Alice|");
     get_msg(fd1, (char[BUF]){0}); //WAIT
 
     send_raw(fd2, "0|09|OPEN|Bob|");
@@ -124,14 +124,14 @@ void test_invalid_move() {
     get_msg(fd2, (char[BUF]){0});
 
     //Alice tries to remove from nonexistent pile 10
-    send_raw(fd1, "0|11|MOVE|10|1|");
+    send_raw(fd1, "0|10|MOVE|10|1|");
 
     char r[BUF];
     get_msg(fd1, r);
     printf("Server replied: %s\n", r);
 
     // tries to move too many from a pile
-    send_raw(fd1, "0|09|MOVE|1|100|");
+    send_raw(fd1, "0|11|MOVE|1|100|");
     get_msg(fd1, r);
     printf("Server replied: %s\n", r);
 
@@ -144,14 +144,14 @@ void test_matchmaking() {
     printf("\n-- Test: MATCHMAKING --\n");
 
     int fd1 = connect_client();
-    send_raw(fd1, "0|11|OPEN|Zed|");
+    send_raw(fd1, "0|09|OPEN|Zed|");
 
     char buf[BUF];
     get_msg(fd1, buf);
     printf("Player 1 WAIT: %s\n", buf);
 
     int fd2 = connect_client();
-    send_raw(fd2, "0|12|OPEN|Luna|");
+    send_raw(fd2, "0|10|OPEN|Luna|");
 
     get_msg(fd1, buf);
     printf("Player 1 NAME: %s\n", buf);
@@ -176,10 +176,10 @@ void test_full_game() {
     int fd1 = connect_client();
     int fd2 = connect_client();
 
-    send_raw(fd1, "0|11|OPEN|AAA|");
+    send_raw(fd1, "0|09|OPEN|AAA|");
     get_msg(fd1,(char[BUF]){0});
 
-    send_raw(fd2, "0|11|OPEN|BBB|");
+    send_raw(fd2, "0|09|OPEN|BBB|");
     get_msg(fd1,(char[BUF]){0}); //NAME
     get_msg(fd2,(char[BUF]){0});
 
@@ -200,11 +200,11 @@ void test_full_game() {
     get_msg(fd1,(char[BUF]){0});
     get_msg(fd2,(char[BUF]){0});
 
-    send_raw(fd2, "0|08|MOVE|2|3|");
+    send_raw(fd2, "0|09|MOVE|2|3|");
     get_msg(fd1,(char[BUF]){0});
     get_msg(fd2,(char[BUF]){0});
 
-    send_raw(fd1, "0|07|MOVE|1|1|");
+    send_raw(fd1, "0|09|MOVE|1|1|");
 
     //expect game to end: fd1 should win
     char final[BUF];
@@ -223,7 +223,7 @@ void test_disconnect_before_game() {
     printf("\n-- Test: DISCONNECT BEFORE MATCH --\n");
 
     int fd = connect_client();
-    send_raw(fd, "0|11|OPEN|Solo|");
+    send_raw(fd, "0|10|OPEN|Solo|");
 
     char buf[BUF];
     get_msg(fd, buf);
@@ -233,6 +233,33 @@ void test_disconnect_before_game() {
     close(fd);
 
     sleep(1); //allow server to process
+
+    // connect two new clients to make sure server runs matching without previous client
+    int fd1 = connect_client();
+    send_raw(fd1, "0|10|OPEN|Joey|");
+
+    get_msg(fd1, buf);
+    printf("Player1 WAIT: %s\n", buf);
+
+    int fd2 = connect_client();
+    send_raw(fd2, "0|09|OPEN|Joe|");
+
+    get_msg(fd1, buf);
+    printf("Player1 NAME: %s\n", buf);
+
+    get_msg(fd2, buf);
+    printf("Player2 NAME: %s\n", buf);
+
+    get_msg(fd1, buf);
+    printf("Player1 PLAY: %s\n", buf);
+
+    get_msg(fd2, buf);
+    printf("Player2 PLAY: %s\n", buf);
+
+    // Clean up
+    close(fd1);
+    close(fd2);
+
 }
 
 //test 8: disconnect during game
@@ -242,10 +269,10 @@ void test_disconnect_during_game() {
     int fd1 = connect_client();
     int fd2 = connect_client();
 
-    send_raw(fd1, "0|11|OPEN|A|");
+    send_raw(fd1, "0|07|OPEN|A|");
     get_msg(fd1,(char[BUF]){0});
 
-    send_raw(fd2, "0|11|OPEN|B|");
+    send_raw(fd2, "0|07|OPEN|B|");
     get_msg(fd1,(char[BUF]){0});
     get_msg(fd2,(char[BUF]){0});
 
@@ -270,10 +297,10 @@ void test_concurrent_and_duplicate() {
     int A1 = connect_client();
     int A2 = connect_client();
 
-    send_raw(A1, "0|11|OPEN|A1|");
+    send_raw(A1, "0|08|OPEN|A1|");
     get_msg(A1, (char[BUF]){0}); //WAIT
 
-    send_raw(A2, "0|11|OPEN|A2|");
+    send_raw(A2, "0|08|OPEN|A2|");
     get_msg(A1, (char[BUF]){0}); //NAME
     get_msg(A2, (char[BUF]){0}); //NAME
 
@@ -284,10 +311,10 @@ void test_concurrent_and_duplicate() {
     int B1 = connect_client();
     int B2 = connect_client();
 
-    send_raw(B1, "0|11|OPEN|B1|");
+    send_raw(B1, "0|08|OPEN|B1|");
     get_msg(B1, (char[BUF]){0}); //WAIT
 
-    send_raw(B2, "0|11|OPEN|B2|");
+    send_raw(B2, "0|08|OPEN|B2|");
     get_msg(B1, (char[BUF]){0}); //NAME
     get_msg(B2, (char[BUF]){0}); //NAME
 
@@ -298,7 +325,7 @@ void test_concurrent_and_duplicate() {
 
     //try connecting a third client with a duplicate name A1
     int dup = connect_client();
-    send_raw(dup, "0|11|OPEN|A1|");
+    send_raw(dup, "0|08|OPEN|A1|");
 
     char reply[BUF];
     if (get_msg(dup, reply) > 0)
@@ -309,11 +336,11 @@ void test_concurrent_and_duplicate() {
     close(dup);
 
     //clean up  4 real players
-    send_raw(A1, "0|07|MOVE|1|1|");
+    send_raw(A1, "0|09|MOVE|1|1|");
     get_msg(A1,(char[BUF]){0});
     get_msg(A2,(char[BUF]){0});
 
-    send_raw(B1, "0|07|MOVE|1|1|");
+    send_raw(B1, "0|09|MOVE|1|1|");
     get_msg(B1,(char[BUF]){0});
     get_msg(B2,(char[BUF]){0});
 
