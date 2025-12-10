@@ -61,13 +61,13 @@ void handle_move(Game *g, Player *p, Message *msg){
 
     if(pile < 1 || pile > 5){
         handle_fail(p, 32, "Pile Index");
-        send_play(g);
+        send_play_single(p, g);
         return;
     }
 
     if(quantity < 1 || quantity > g->piles[pile - 1]){
         handle_fail(p, 33, "Quantity");
-        send_play(g);
+        send_play_single(p, g);
         return;
     }
 

@@ -123,6 +123,7 @@ int main(int argc, char *argv[]) {
             Player *p1 = queue_player;
             Player *p2 = player;
             queue_player = NULL;
+            printf("Two players have been matched\n");
 
             pid_t pid = fork();
             if (pid < 0) {
@@ -142,8 +143,6 @@ int main(int argc, char *argv[]) {
                 nimd_game(p1, p2);
                 exit(0);
             }
-
-            // Parent does NOT close p1/p2 FDs; child owns them
         }
     }
 
@@ -154,6 +153,8 @@ int main(int argc, char *argv[]) {
 void nimd_game(Player *p1, Player *p2) {
     Game g;
     create_game(&g, p1, p2);
+    p1->p_num = 1;
+    p2->p_num = 2;
 
     send_name(p1->fd, 1, p2->name);
     send_name(p2->fd, 2, p1->name);
@@ -169,11 +170,11 @@ void nimd_game(Player *p1, Player *p2) {
             break;
         }
 
-        if (strcmp(msg->type, "MOVE") != 0) {
-            handle_fail(current_p, 31, "Expected MOVE");
-            free_message(msg);
-            continue;
-        }
+        // if (strcmp(msg->type, "MOVE") != 0) {
+        //     handle_fail(current_p, 31, "Expected MOVE");
+        //     free_message(msg);
+        //     continue;
+        // }
 
         handle_move(&g, current_p, msg);
         free_message(msg);

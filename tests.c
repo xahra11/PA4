@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <ctype.h>
 
 #define TEST_PORT 34567
 #define BUF 512
@@ -32,13 +33,42 @@ void send_raw(int fd, const char *s) {
 }
 
 int get_msg(int fd, char *out) {
-    int n = read(fd, out, BUF-1);
-    if (n > 0) {
-        out[n] = 0;
-        return n;
+    char header[5]; 
+    int bytes_read = 0;
+
+    while (bytes_read < 2) {
+        int n = read(fd, header + bytes_read, 2 - bytes_read);
+        if (n <= 0) return n;
+        bytes_read += n;
     }
-    return n;
+
+    if (header[0] != '0' || header[1] != '|') return -1;
+
+    while (bytes_read < 4) {
+        int n = read(fd, header + bytes_read, 4 - bytes_read);
+        if (n <= 0) return n;
+        bytes_read += n;
+    }
+
+    if (!isdigit(header[2]) || !isdigit(header[3])) return -1;
+
+    int msg_len = (header[2]-'0')*10 + (header[3]-'0');
+
+    char bar;
+    if (read(fd, &bar, 1) <= 0) return -1;
+    if (bar != '|') return -1;
+
+    int total = 0;
+    while (total < msg_len) {
+        int n = read(fd, out + total, msg_len - total);
+        if (n <= 0) return n;
+        total += n;
+    }
+
+    out[msg_len] = '\0'; 
+    return total;
 }
+
 
 void expect_type(int fd, const char *type) {
     char buf[BUF];
@@ -111,10 +141,10 @@ void test_invalid_move() {
     int fd1 = connect_client();
     int fd2 = connect_client();
 
-    send_raw(fd1, "0|11|OPEN|Charlie|");
+    send_raw(fd1, "0|13|OPEN|Charlie|");
     expect_type(fd1, "WAIT");
 
-    send_raw(fd2, "0|09|OPEN|Delta|");
+    send_raw(fd2, "0|11|OPEN|Delta|");
 
     expect_type(fd1, "NAME");
     expect_type(fd2, "NAME");
@@ -139,7 +169,7 @@ void test_full_game() {
     send_raw(fd1, "0|09|OPEN|Eve|");
     expect_type(fd1, "WAIT");
 
-    send_raw(fd2, "0|09|OPEN|Frank|");
+    send_raw(fd2, "0|11|OPEN|Frank|");
 
     expect_type(fd1, "NAME");
     expect_type(fd2, "NAME");
@@ -172,10 +202,10 @@ void test_disconnect_during_game() {
     int fd1 = connect_client();
     int fd2 = connect_client();
 
-    send_raw(fd1, "0|07|OPEN|H1|");
+    send_raw(fd1, "0|08|OPEN|H1|");
     expect_type(fd1, "WAIT");
 
-    send_raw(fd2, "0|07|OPEN|I1|");
+    send_raw(fd2, "0|08|OPEN|I1|");
     expect_type(fd1, "NAME");
     expect_type(fd2, "NAME");
     expect_type(fd1, "PLAY");
