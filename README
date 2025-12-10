@@ -1,0 +1,40 @@
+Zahra Fakhri zf153
+Jazmin Delos Santos jad629
+
+Testing Plan: Run tests.c which creates a server and client connections that are used to simulate the different test cases. Write helper functions to connect clients, send messages from clients, and read expected messages from server in NGP format. 
+
+Test 1: bad message format
+Requirement: Server must handle poorly formatted messages and reject invalid input.
+Detection Method: Send messages with invalid message fields, missing framing, and invalid name length. Ensure server replies with an error message “... FAIL|10 Invalid|” for incorrect format and “... FAIL| 21 Long Name|” for invalid name length.
+
+Test 2: incorrect timing
+Requirement: Server must make sure all message sequences are in order
+Detection Method: Send a MOVE command before opening a game. Ensure server replies with an error message “... FAIL|24 Not Playing|”
+
+Test 3: client matching
+Requirement: Server must correctly match clients into a game, notify them of their opponent, and start the game state. 
+Detection Method: Two clients send an OPEN command to the server. Ensure server replies with WAIT, NAME, and PLAY messages, indicating that a game has properly begun.
+
+Test 4: invalid move
+Requirement: Server must ensure each MOVE is valid, checking the pile number and the quantity of stones to be moved.
+Detection Method: Send a MOVE command to an out of bounds pile or remove more stones/less stones than allowed. Ensure server replies with an error message “FAIL 32 Pile Index” and “... FAIL|33 Quantity|”
+
+Test 5: full game 
+Requirement: Server must correctly run a complete game, updating pile states and declaring a winner.
+Detection Method: Two clients play a game with a sequence of MOVE commands. Ensure the final message sent from server to client has the correct winner.
+
+Test 6: disconnect before the game
+Requirement: Server must correctly drop a player and not consider them for matching if the client disconnects before a game starts.
+Detection Method: Client connects with an OPEN message and closes socket before being matched into a game. Ensure server processes disconnect and can continue with two new players. 
+
+Test 7: disconnect during the game
+Requirement: Server must handle when a client disconnects mid-game, declaring the remaining player the winner by forfeit.
+Detection Method: Two clients start a game, but one disconnects. Ensure the server tells the remaining client that they won with “OVER| … |Forfeit|”
+
+Test 8: concurrent games
+Requirement: Server must support multiple games at once and prevent duplicate player names.
+Detection Method: Two games begin. A client with a duplicate name attends to connect to the server. Ensure the server rejects that client with “... FAIL|22 Already Playing|” and the two games are running independently. 
+
+Test 9: Extra Credit
+Requirement: Server receives and processes messages/moves from clients in a game as they come.
+Detection Method: Two clients start a game. If a player tries to make moves when it is not their turn, ensure that the server responds immediately, rather than waiting for a response from the current player. If a player disconnects while it is the other player’s turn, ensure that the server immediately declares the game as over with “OVER| … |Forfeit|” without waiting for the other player’s move. 
