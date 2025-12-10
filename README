@@ -1,6 +1,8 @@
 Zahra Fakhri zf153
 Jazmin Delos Santos jad629
 
+The server handles concurrent games and the extra credit.
+
 Testing Plan: Run tests.c which creates a server and client connections that are used to simulate the different test cases. Write helper functions to connect clients, send messages from clients, and read expected messages from server in NGP format. 
 
 Test 1: bad message format
@@ -38,3 +40,4 @@ Detection Method: Two games begin. A client with a duplicate name attends to con
 Test 9: Extra Credit
 Requirement: Server receives and processes messages/moves from clients in a game as they come.
 Detection Method: Two clients start a game. If a player tries to make moves when it is not their turn, ensure that the server responds immediately, rather than waiting for a response from the current player. If a player disconnects while it is the other player’s turn, ensure that the server immediately declares the game as over with “OVER| … |Forfeit|” without waiting for the other player’s move. 
+
