@@ -119,6 +119,17 @@ int main(int argc, char *argv[]) {
             printf("A player is waiting for an opponent\n");
             fflush(stdout);
         } else {
+            if (queue_player) {
+                char tmp;
+                int r = recv(queue_player->fd, &tmp, 1, MSG_PEEK | MSG_DONTWAIT);
+                if (r == 0) {
+                    remove_active(queue_player);
+                    close(queue_player->fd);
+                    free(queue_player);
+                    queue_player = NULL;
+                    continue;
+                }
+            }
             // Match found
             Player *p1 = queue_player;
             Player *p2 = player;

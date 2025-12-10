@@ -177,10 +177,10 @@ void test_full_game() {
     expect_type(fd2, "PLAY");
 
     // Play deterministic moves
-    send_raw(fd1, "0|09|MOVE|5|9|"); expect_type(fd1, "PLAY");
-    send_raw(fd2, "0|09|MOVE|4|7|"); expect_type(fd1, "PLAY");
-    send_raw(fd1, "0|09|MOVE|3|5|"); expect_type(fd1, "PLAY");
-    send_raw(fd2, "0|09|MOVE|2|3|"); expect_type(fd1, "PLAY");
+    send_raw(fd1, "0|09|MOVE|5|9|"); expect_type(fd1, "PLAY"); expect_type(fd2, "PLAY");
+    send_raw(fd2, "0|09|MOVE|4|7|"); expect_type(fd1, "PLAY"); expect_type(fd2, "PLAY");
+    send_raw(fd1, "0|09|MOVE|3|5|"); expect_type(fd1, "PLAY"); expect_type(fd2, "PLAY");
+    send_raw(fd2, "0|09|MOVE|2|3|"); expect_type(fd1, "PLAY"); expect_type(fd2, "PLAY");
     send_raw(fd1, "0|09|MOVE|1|1|"); expect_type(fd1, "OVER"); expect_type(fd2, "OVER");
 
     close(fd1);
