@@ -64,7 +64,6 @@ int main(int argc, char *argv[]) {
             char tmp;
             int r = recv(queue_player->fd, &tmp, 1, MSG_PEEK | MSG_DONTWAIT);
             if (r == 0) {
-                remove_active(queue_player);
                 close(queue_player->fd);
                 free(queue_player);
                 queue_player = NULL;
@@ -116,24 +115,23 @@ int main(int argc, char *argv[]) {
         if (!queue_player) {
             queue_player = player;
             send_wait(queue_player->fd);
-            printf("A player is waiting for an opponent\n");
-            fflush(stdout);
         } else {
-            if (queue_player) {
-                char tmp;
-                int r = recv(queue_player->fd, &tmp, 1, MSG_PEEK | MSG_DONTWAIT);
-                if (r == 0) {
-                    remove_active(queue_player);
-                    close(queue_player->fd);
-                    free(queue_player);
-                    queue_player = NULL;
-                    continue;
-                }
+            char tmp;
+            int r = recv(queue_player->fd, &tmp, 1, MSG_PEEK | MSG_DONTWAIT);
+            if (r == 0) {
+                close(queue_player->fd);
+                free(queue_player);
+                queue_player = player;
+                send_wait(queue_player->fd);
+                continue;
             }
+
             // Match found
             Player *p1 = queue_player;
             Player *p2 = player;
             queue_player = NULL;
+            add_active(p1);
+            add_active(p2);
             printf("Two players have been matched\n");
 
             pid_t pid = fork();
@@ -171,30 +169,90 @@ void nimd_game(Player *p1, Player *p2) {
     send_name(p2->fd, 2, p1->name);
     send_play(&g);
 
-    while (1) {
-        Player *current_p = (g.next_p == 1) ? p1 : p2;
+    int max_fd = (p1->fd > p2->fd) ? p1->fd : p2->fd;
 
-        Message *msg = read_message(current_p->fd);
-        if (!msg) {
-            Player *winner = (g.next_p == 1) ? p2 : p1;
-            send_over(&g, winner->p_num, "Forfeit");
+    while (1) {
+        // Player *current_p = (g.next_p == 1) ? p1 : p2;
+
+        // Message *msg = read_message(current_p->fd);
+        // if (!msg) {
+        //     Player *winner = (g.next_p == 1) ? p2 : p1;
+        //     send_over(&g, winner->p_num, "Forfeit");
+        //     break;
+        // }
+
+        // // if (strcmp(msg->type, "MOVE") != 0) {
+        // //     handle_fail(current_p, 31, "Expected MOVE");
+        // //     free_message(msg);
+        // //     continue;
+        // // }
+
+        // handle_move(&g, current_p, msg);
+        // free_message(msg);
+
+        // bool empty = true;
+        // for (int i = 0; i < 5; i++)
+        //     if (g.piles[i] > 0) { empty = false; break; }
+
+        // if (empty) break;
+
+        // extra credit
+        fd_set read_fds;
+        FD_ZERO(&read_fds);
+        FD_SET(p1->fd, &read_fds);
+        FD_SET(p2->fd, &read_fds);
+
+        int r = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
+        if(r < 0){
+            perror("select");
             break;
         }
 
-        // if (strcmp(msg->type, "MOVE") != 0) {
-        //     handle_fail(current_p, 31, "Expected MOVE");
-        //     free_message(msg);
-        //     continue;
-        // }
+        Player *players[2] = {p1, p2};
+        for(int i = 0; i < 2; i++){
+            Player *p = players[i];
+            if(!FD_ISSET(p->fd, &read_fds)) continue;
 
-        handle_move(&g, current_p, msg);
-        free_message(msg);
+            char tmp;
+            int r = recv(p->fd, &tmp, 1, MSG_PEEK | MSG_DONTWAIT);
+            if (r == 0) {
+                Player *winner = (p == p1) ? p2 : p1;
+                send_over(&g, winner->p_num, "Forfeit");
+                remove_active(p1); remove_active(p2);
+                close(p1->fd); close(p2->fd);
+                free(p1); free(p2);
+                return;
+            }
+            
+            Message *msg = read_message(p->fd);
 
-        bool empty = true;
-        for (int i = 0; i < 5; i++)
-            if (g.piles[i] > 0) { empty = false; break; }
+                // if(strcmp(msg->type, "OPEN") == 0){
+                //     handle_fail(p, 23, "Already Open");
+                //     free_message(msg);
+                //     continue
+                // }
 
-        if (empty) break;
+            if (!msg || strcmp(msg->type, "MOVE") != 0) {
+                handle_fail(p, 10, "Invalid");
+                free_message(msg);
+                continue;
+            }
+
+            if (p->p_num != g.next_p) {
+                handle_fail(p, 31, "Impatient");
+                free_message(msg);
+                continue;
+            }
+
+            handle_move(&g, p, msg);
+            free_message(msg);
+
+            bool empty = true;
+            for (int i = 0; i < 5; i++)
+                if (g.piles[i] > 0) { empty = false; break; }
+
+            if (empty) break;
+        }
     }
 
     remove_active(p1); remove_active(p2);

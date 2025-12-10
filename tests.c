@@ -104,10 +104,10 @@ void test_bad_format() {
 }
 
 void test_wrong_time() {
-    printf("\n-- Test: WRONG TIME (MOVE before OPEN) --\n");
     int fd = connect_client();
     char buf[BUF];
 
+    printf("\n-- Test: WRONG TIME (MOVE before OPEN) --\n");
     send_raw(fd, "0|09|MOVE|1|1|");
     get_msg(fd, buf);
     printf("Reply: %s\n", buf);
@@ -206,7 +206,7 @@ void test_disconnect_during_game() {
     expect_type(fd1, "WAIT");
 
     send_raw(fd2, "0|08|OPEN|I1|");
-    expect_type(fd1, "NAME");
+    expect_type(fd1, "NAME"); 
     expect_type(fd2, "NAME");
     expect_type(fd1, "PLAY");
     expect_type(fd2, "PLAY");
@@ -254,6 +254,33 @@ void test_concurrent_and_duplicate() {
     small_delay();
 }
 
+void test_extra_credit_impatient_move() {
+    printf("\n-- Test: EXTRA CREDIT IMPATIENT MOVE --\n");
+    int fd1 = connect_client();
+    int fd2 = connect_client();
+
+    send_raw(fd1, "0|11|OPEN|Jason|");
+    expect_type(fd1, "WAIT");
+
+    send_raw(fd2, "0|10|OPEN|Todd|");
+
+    expect_type(fd1, "NAME");
+    expect_type(fd2, "NAME");
+    expect_type(fd1, "PLAY");
+    expect_type(fd2, "PLAY");
+
+    send_raw(fd2, "0|09|MOVE|3|2|");
+    expect_type(fd2, "FAIL");  
+
+    send_raw(fd1, "0|09|MOVE|3|1|");
+    expect_type(fd1, "PLAY");  
+    expect_type(fd2, "PLAY");
+
+    close(fd1);
+    close(fd2);
+    small_delay();
+}
+
 int main() {
     printf("NIMD TEST\n");
     test_bad_format();
@@ -264,6 +291,8 @@ int main() {
     test_disconnect_before_match();
     test_disconnect_during_game();
     test_concurrent_and_duplicate();
+    test_extra_credit_impatient_move();
+
     printf("\nTESTING COMPLETE\n");
     return 0;
 }

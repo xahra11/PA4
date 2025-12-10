@@ -23,7 +23,9 @@ void handle_open(Player *p, Message *msg) {
 
     if (p->open) {
         handle_fail(p, 23, "Already Open");
+        remove_active(p);
         close(p->fd);
+        free(p);
         return;
     }
 
@@ -36,8 +38,6 @@ void handle_open(Player *p, Message *msg) {
     strncpy(p->name, name, 72);
     p->name[72] = '\0';
     p->open = true;
-
-    add_active(p);
 
     printf("Player '%s' connected\n", p->name);
     fflush(stdout);
