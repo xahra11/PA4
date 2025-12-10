@@ -232,9 +232,14 @@ void nimd_game(Player *p1, Player *p2) {
                 //     continue
                 // }
 
-            if (!msg || strcmp(msg->type, "MOVE") != 0) {
+            if (!msg) {
                 handle_fail(p, 10, "Invalid");
                 free_message(msg);
+                continue;
+            }
+
+            if(strcmp(msg->type, "OPEN") == 0){
+                handle_open(p, msg);
                 continue;
             }
 

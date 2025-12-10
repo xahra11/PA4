@@ -16,7 +16,7 @@ void handle_open(Player *p, Message *msg) {
     char *name = msg->fields[0];
 
     if (!is_valid_name(name)) {
-        handle_fail(p, 21, "Long Name or Invalid");
+        handle_fail(p, 21, "Long Name");
         close(p->fd);
         return;
     }

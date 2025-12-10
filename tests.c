@@ -94,23 +94,40 @@ void small_delay() {
 void test_bad_format() {
     printf("\n-- Test: BAD FORMAT --\n");
     int fd = connect_client();
-    char buf[BUF];
 
     send_raw(fd, "0|XX|BAD|MESSAGE|");
-    get_msg(fd, buf);
-    printf("Reply: %s\n", buf);
+    expect_type(fd, "FAIL");
+
+    fd = connect_client();
+    send_raw(fd, "0|09|OPEN|Meow");
+    expect_type(fd, "FAIL");
+
+    fd = connect_client();
+    send_raw(fd, "0|05|OPEN|");
+    expect_type(fd, "FAIL");
+
+    printf("\n-- Test: LONG NAME (>72 chars) --\n");
+    fd = connect_client();
+    char long_name[75];
+    for (int i = 0; i < 73; i++) long_name[i] = 'A' + (i % 26);
+    long_name[73] = '\0';
+
+    int msg_len = 79; 
+    char msg[BUF];
+    snprintf(msg, BUF, "0|%02d|OPEN|%s|", msg_len, long_name);
+    send_raw(fd, msg);
+    expect_type(fd, "FAIL"); 
+
     close(fd);
     small_delay();
 }
 
 void test_wrong_time() {
     int fd = connect_client();
-    char buf[BUF];
 
     printf("\n-- Test: WRONG TIME (MOVE before OPEN) --\n");
     send_raw(fd, "0|09|MOVE|1|1|");
-    get_msg(fd, buf);
-    printf("Reply: %s\n", buf);
+    expect_type(fd, "FAIL");
     close(fd);
     small_delay();
 }
@@ -156,6 +173,14 @@ void test_invalid_move() {
     expect_type(fd1, "FAIL");
     expect_type(fd1, "PLAY");
 
+    send_raw(fd1, "0|11|MOVE|3|100|");
+    expect_type(fd1, "FAIL");
+    expect_type(fd1, "PLAY");
+
+    send_raw(fd1, "0|10|MOVE|3|-4|");
+    expect_type(fd1, "FAIL");
+    expect_type(fd1, "PLAY");
+
     close(fd1);
     close(fd2);
     small_delay();
@@ -179,8 +204,18 @@ void test_full_game() {
     // Play deterministic moves
     send_raw(fd1, "0|09|MOVE|5|9|"); expect_type(fd1, "PLAY"); expect_type(fd2, "PLAY");
     send_raw(fd2, "0|09|MOVE|4|7|"); expect_type(fd1, "PLAY"); expect_type(fd2, "PLAY");
+
+
+    // client connects mid game and receives wait, theyre in queue
+    int fd3 = connect_client();
+    send_raw(fd3, "0|09|OPEN|Tim|");
+    expect_type(fd3, "WAIT");
+
     send_raw(fd1, "0|09|MOVE|3|5|"); expect_type(fd1, "PLAY"); expect_type(fd2, "PLAY");
     send_raw(fd2, "0|09|MOVE|2|3|"); expect_type(fd1, "PLAY"); expect_type(fd2, "PLAY");
+
+    close(fd3);
+
     send_raw(fd1, "0|09|MOVE|1|1|"); expect_type(fd1, "OVER"); expect_type(fd2, "OVER");
 
     close(fd1);
@@ -271,13 +306,18 @@ void test_extra_credit_impatient_move() {
 
     send_raw(fd2, "0|09|MOVE|3|2|");
     expect_type(fd2, "FAIL");  
+    send_raw(fd2, "0|09|MOVE|3|2|");
+    expect_type(fd2, "FAIL");  
 
     send_raw(fd1, "0|09|MOVE|3|1|");
     expect_type(fd1, "PLAY");  
     expect_type(fd2, "PLAY");
 
-    close(fd1);
+    // disconnect mid turn
     close(fd2);
+    expect_type(fd1, "OVER");
+
+    close(fd1);
     small_delay();
 }
 
