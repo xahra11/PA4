@@ -289,7 +289,7 @@ void test_concurrent_and_duplicate() {
     small_delay();
 }
 
-void test_extra_credit_impatient_move() {
+void test_extra_credit() {
     printf("\n-- Test: EXTRA CREDIT IMPATIENT MOVE --\n");
     int fd1 = connect_client();
     int fd2 = connect_client();
@@ -314,8 +314,8 @@ void test_extra_credit_impatient_move() {
     expect_type(fd2, "PLAY");
 
     // disconnect mid turn
-    close(fd2);
-    expect_type(fd1, "OVER");
+    close(fd1);
+    expect_type(fd2, "OVER");
 
     close(fd1);
     small_delay();
@@ -331,7 +331,7 @@ int main() {
     test_disconnect_before_match();
     test_disconnect_during_game();
     test_concurrent_and_duplicate();
-    test_extra_credit_impatient_move();
+    test_extra_credit();
 
     printf("\nTESTING COMPLETE\n");
     return 0;
